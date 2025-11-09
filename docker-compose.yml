@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  docker-api:
+    build: ./
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - internal
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    ports:
+      - 8014:8080
+
+networks:
+  internal:
+    driver: bridge

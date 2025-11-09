@@ -1,0 +1,22 @@
+[project]
+name = "docker-api"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "www",email = "pyostr@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi (>=0.121.1,<0.122.0)",
+    "uvicorn (>=0.38.0,<0.39.0)",
+    "docker (>=7.1.0,<8.0.0)",
+    "psutil (>=7.1.3,<8.0.0)",
+    "websockets (>=15.0.1,<16.0.0)",
+    "python-dotenv (>=1.2.1,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
