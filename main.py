@@ -4,13 +4,18 @@
 # Версия 4.2 — добавлена простая авторизация по статичному токену.
 # =============================================================================
 import json
+import os
+
 import psutil
 import docker
 import asyncio
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
 
 # == Конфигурация =============================================================
-ACCESS_TOKEN = "MY_STATIC_ACCESS_TOKEN_123"  # ← замени потом на значение из nFile
+load_dotenv()
+ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')  # ← замени потом на значение из nFile
 
 app = FastAPI(title="Docker WebSocket API", version="4.2")
 client = docker.from_env()
