@@ -248,6 +248,40 @@ async def websocket_docker(websocket: WebSocket):
                     await websocket.send_text(json.dumps({"message": "Log stream stopped"}))
                 else:
                     await websocket.send_text(json.dumps({"message": "No active log stream"}))
+            # --- restart services (run shell script with live output) ---
+            elif action == "restart_services":
+                try:
+                    script_path = "/root/utils/restart_services.sh"
+                    if not os.path.exists(script_path):
+                        await websocket.send_text(json.dumps({"error": "Script not found"}))
+                        continue
+
+                    # Запускаем процесс
+                    proc = await asyncio.create_subprocess_exec(
+                        "/bin/bash",
+                        script_path,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT
+                    )
+
+                    await websocket.send_text(json.dumps({"type": "services_log", "data": "--- Запуск скрипта ---"}))
+
+                    # Построчный вывод
+                    while True:
+                        line = await proc.stdout.readline()
+                        if not line:
+                            break
+                        text = line.decode("utf-8", "ignore").rstrip()
+                        await websocket.send_text(json.dumps({"type": "services_log", "data": text}))
+
+                    code = await proc.wait()
+                    await websocket.send_text(json.dumps({
+                        "type": "services_done",
+                        "data": {"exit_code": code}
+                    }))
+
+                except Exception as e:
+                    await websocket.send_text(json.dumps({"error": f"Service restart error: {str(e)}"}))
 
             # --- system resources ---
             elif action == "system_resources":
