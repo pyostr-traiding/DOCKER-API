@@ -248,9 +248,9 @@ async def websocket_docker(websocket: WebSocket):
                     await websocket.send_text(json.dumps({"message": "Log stream stopped"}))
                 else:
                     await websocket.send_text(json.dumps({"message": "No active log stream"}))
-            # --- FULL RESTART ---
-            elif action == "full_restart":
-                order = [
+            # --- restart sequence ---
+            elif action == "restart_sequence":
+                sequence = [
                     "bybit-stream",
                     "streaming-candle-bybit",
                     "admin-panel",
@@ -261,31 +261,38 @@ async def websocket_docker(websocket: WebSocket):
                     "combinator"
                 ]
 
-                async def restart_one(name):
+                async def do_sequence():
                     try:
-                        container = client.containers.get(name)
-                        await websocket.send_text(json.dumps({"type": "fr_step", "data": f"Stopping {name}…"}))
-                        container.stop()
-                        await asyncio.sleep(1)
+                        await websocket.send_text(
+                            json.dumps({"type": "seq_step", "data": "Начинаю последовательную перезагрузку…"}))
 
-                        await websocket.send_text(json.dumps({"type": "fr_step", "data": f"Starting {name}…"}))
-                        container.start()
-                        await asyncio.sleep(1)
+                        for name in sequence:
+                            try:
+                                await websocket.send_text(
+                                    json.dumps({"type": "seq_step", "data": f"⏸ Останавливаю {name}…"}))
+                                c = client.containers.get(name)
+                                c.stop()
+                                await asyncio.sleep(1)
 
-                        await websocket.send_text(json.dumps({"type": "fr_step", "data": f"{name} restarted"}))
+                                await websocket.send_text(
+                                    json.dumps({"type": "seq_step", "data": f"🔄 Запускаю {name}…"}))
+                                c.start()
+                                await asyncio.sleep(2)
+
+                                await websocket.send_text(
+                                    json.dumps({"type": "seq_step", "data": f"✔ {name} перезапущен"}))
+
+                            except Exception as e:
+                                await websocket.send_text(
+                                    json.dumps({"type": "seq_step", "data": f"❗ Ошибка {name}: {e}"}))
+
+                        await websocket.send_text(json.dumps({"type": "seq_done", "data": "Готово"}))
+
                     except Exception as e:
-                        await websocket.send_text(json.dumps({"error": f"Failed {name}: {e}"}))
+                        await websocket.send_text(
+                            json.dumps({"type": "seq_step", "data": f"❗ Ошибка последовательности: {e}"}))
 
-                # запускаем фоновой задачей
-                async def full_restart():
-                    await websocket.send_text(json.dumps({"type": "fr_begin"}))
-
-                    for name in order:
-                        await restart_one(name)
-
-                    await websocket.send_text(json.dumps({"type": "fr_done"}))
-
-                asyncio.create_task(full_restart())
+                asyncio.create_task(do_sequence())
 
             # --- system resources ---
             elif action == "system_resources":
