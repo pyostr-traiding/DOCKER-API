@@ -251,7 +251,7 @@ async def websocket_docker(websocket: WebSocket):
             # --- restart services (run shell script with live output) ---
             elif action == "restart_services":
                 try:
-                    script_path = "/root/utils/restart_services.sh"
+                    script_path = "/utils/restart_services.sh"
                     if not os.path.exists(script_path):
                         await websocket.send_text(json.dumps({"error": "Script not found"}))
                         continue
