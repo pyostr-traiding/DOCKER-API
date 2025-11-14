@@ -248,40 +248,44 @@ async def websocket_docker(websocket: WebSocket):
                     await websocket.send_text(json.dumps({"message": "Log stream stopped"}))
                 else:
                     await websocket.send_text(json.dumps({"message": "No active log stream"}))
-            # --- restart services (run shell script with live output) ---
-            elif action == "restart_services":
-                try:
-                    script_path = "/utils/restart_services.sh"
-                    if not os.path.exists(script_path):
-                        await websocket.send_text(json.dumps({"error": "Script not found"}))
-                        continue
+            # --- FULL RESTART ---
+            elif action == "full_restart":
+                order = [
+                    "bybit-stream",
+                    "streaming-candle-bybit",
+                    "admin-panel",
+                    "panel-celery-tasks",
+                    "panel-beat",
+                    "signals-btc-1",
+                    "monitoring",
+                    "combinator"
+                ]
 
-                    # Запускаем процесс
-                    proc = await asyncio.create_subprocess_exec(
-                        "/bin/bash",
-                        script_path,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.STDOUT
-                    )
+                async def restart_one(name):
+                    try:
+                        container = client.containers.get(name)
+                        await websocket.send_text(json.dumps({"type": "fr_step", "data": f"Stopping {name}…"}))
+                        container.stop()
+                        await asyncio.sleep(1)
 
-                    await websocket.send_text(json.dumps({"type": "services_log", "data": "--- Запуск скрипта ---"}))
+                        await websocket.send_text(json.dumps({"type": "fr_step", "data": f"Starting {name}…"}))
+                        container.start()
+                        await asyncio.sleep(1)
 
-                    # Построчный вывод
-                    while True:
-                        line = await proc.stdout.readline()
-                        if not line:
-                            break
-                        text = line.decode("utf-8", "ignore").rstrip()
-                        await websocket.send_text(json.dumps({"type": "services_log", "data": text}))
+                        await websocket.send_text(json.dumps({"type": "fr_step", "data": f"{name} restarted"}))
+                    except Exception as e:
+                        await websocket.send_text(json.dumps({"error": f"Failed {name}: {e}"}))
 
-                    code = await proc.wait()
-                    await websocket.send_text(json.dumps({
-                        "type": "services_done",
-                        "data": {"exit_code": code}
-                    }))
+                # запускаем фоновой задачей
+                async def full_restart():
+                    await websocket.send_text(json.dumps({"type": "fr_begin"}))
 
-                except Exception as e:
-                    await websocket.send_text(json.dumps({"error": f"Service restart error: {str(e)}"}))
+                    for name in order:
+                        await restart_one(name)
+
+                    await websocket.send_text(json.dumps({"type": "fr_done"}))
+
+                asyncio.create_task(full_restart())
 
             # --- system resources ---
             elif action == "system_resources":
